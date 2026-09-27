@@ -1,0 +1,45 @@
+# Implementation Walkthrough: Pipeline & UDP Bridge
+
+I have successfully implemented Steps 7, 8, and 9 of the system architecture! 
+
+Here is a summary of the new capabilities added to the IntelliComm project:
+
+## 1. Batch Inference (`batch_infer.py`)
+I created a script to rapidly process entire directories of noisy audio files using the GPU. 
+- **Features:** It traverses the input directory, finds all `.wav` and `.flac` files, processes them sequentially through the model, and outputs them to the target directory while preserving the folder structure. 
+- **Validation:** I successfully tested this on a couple of samples. It processed 8 seconds of audio in 1.4 seconds, yielding a Real-Time Factor (RTF) of `0.177x`. 
+
+**Usage:**
+```bash
+python batch_infer.py --input_dir path/to/noisy --output_dir path/to/clean
+```
+
+## 2. Real-time Audio Pipeline (`realtime_infer.py`)
+I built a low-latency real-time inference loop using the `sounddevice` library. 
+- **Architecture:** A background thread manages the GPU inference. It uses a sliding window (2.0 seconds) to provide context for the Conv-TasNet model, but extracts and plays back the latest chunk (0.5 seconds) to minimize perceived delay.
+
+**Usage:**
+*Requires a microphone and speakers/headphones connected.*
+```bash
+python realtime_infer.py
+```
+*(Use `--list-devices` and `--input-device X` / `--output-device Y` if you need to select specific hardware).*
+
+## 3. UDP Field Simulation Bridge (`udp_transmitter.py` & `udp_receiver.py`)
+To simulate the actual field deployment, I decoupled the architecture into a transmitter (the soldier's radio) and a receiver (the base station).
+- **Transmitter:** Captures microphone input and chunks it into 100ms UDP packets.
+- **Receiver:** Listens on the UDP socket, reassembles the packets into a jitter buffer, passes it through the Conv-TasNet model, and outputs to the speaker.
+
+**Usage (Run in two separate terminals):**
+```bash
+# Terminal 1: Start the Base Station Receiver
+python udp_receiver.py --port 9999
+
+# Terminal 2: Start the Field Transmitter
+python udp_transmitter.py --host 127.0.0.1 --port 9999
+```
+
+> [!NOTE]
+> Testing the real-time and UDP scripts requires physical hardware (Microphone/Headphones). Please run these scripts manually on your machine to evaluate the latency and enhancement quality. 
+
+The system is now functionally complete according to the `system_architecture.md` roadmap! Let me know if you would like to tune the latency parameters or proceed to other optimizations.
